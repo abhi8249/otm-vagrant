@@ -8,7 +8,25 @@ sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
 apt-get update
 
-apt-get install -yq python-software-properties python-setuptools git
+# Install essential packages, including build dependencies for compiling Python
+sudo apt-get install -yq python-software-properties python-setuptools git build-essential libssl-dev libreadline-dev zlib1g-dev
+
+# Download Python 2.7.9 source code
+cd /tmp
+wget https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz
+tar -xvzf Python-2.7.9.tgz
+cd Python-2.7.9
+
+# Configure and install Python 2.7.9
+./configure --enable-optimizations
+make
+sudo make altinstall
+
+# Verify the installation
+python2.7 --version  # Should output Python 2.7.9
+
+# Set Python 2.7.9 as the default for Python 2
+sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2.7
 
 cp -rTv --remove-destination /vagrant/configs /
 
@@ -26,8 +44,14 @@ apt-get install -yq gettext libgeos-dev libproj-dev libgdal1-dev build-essential
 
 # pip
 cd /tmp
-wget -nv https://bootstrap.pypa.io/get-pip.py
-python get-pip.py pip==9.0.*
+wget -nv https://bootstrap.pypa.io/pip/2.7/get-pip.py
+#python get-pip.py pip==20.3.4
+
+python get-pip.py pip==20.3.4 --trusted-host pypi.org --trusted-host files.pythonhosted.org
+
+
+# Install additional libraries for SSL and SNI support in Python 2.7
+pip install --upgrade pyOpenSSL ndg-httpsclient pyasn1
 
 # DB
 apt-get install -yq postgresql postgresql-server-dev-9.3 postgresql-contrib postgresql-9.3-postgis-2.1
@@ -57,7 +81,7 @@ pip install -r test-requirements.txt
 mkdir -p /usr/local/otm/static || true
 mkdir -p /usr/local/otm/media || true
 
-apt-get install -yq nodejs
+apt-get install -yq --force-yes nodejs
 npm install -g yarn
 
 # Bundle JS and CSS via webpack
@@ -69,8 +93,8 @@ python opentreemap/manage.py collectstatic --noinput
 # For UI testing
 apt-get install -yq xvfb
 # We use an outdated version of firefox to avoid incompatibilities with selenium
-wget -nv https://s3.amazonaws.com/packages.ci.opentreemap.org/firefox-mozilla-build_46.0.1-0ubuntu1_amd64.deb -O /tmp/firefox.deb
-dpkg -i /tmp/firefox.deb
+# wget -nv https://s3.amazonaws.com/packages.ci.opentreemap.org/firefox-mozilla-build_46.0.1-0ubuntu1_amd64.deb -O /tmp/firefox.deb
+# dpkg -i /tmp/firefox.deb
 
 # Run Django migrations
 python opentreemap/manage.py migrate
@@ -96,16 +120,16 @@ make build
 # tiler
 apt-get install -yq checkinstall g++ libstdc++-5-dev pkg-config libcairo2-dev libjpeg8-dev libgif-dev libpango1.0-dev
 cd /usr/local/tiler
+yarn install --force
 
-yarn --force
+# Install and configure Nginx
+sudo apt-get install -yq nginx
+sudo rm /etc/nginx/sites-enabled/default || true
+sudo ln -sf /etc/nginx/sites-available/otm.conf /etc/nginx/sites-enabled/otm
 
-# nginx
-apt-get install -yq nginx
-rm /etc/nginx/sites-enabled/default || true
-ln -sf /etc/nginx/sites-available/otm.conf /etc/nginx/sites-enabled/otm
-
-chown -R vagrant:vagrant /usr/local/otm/static
-chown -R vagrant:vagrant /usr/local/otm/media
+# Set permissions for static and media directories
+sudo chown -R vagrant:vagrant /usr/local/otm/static
+sudo chown -R vagrant:vagrant /usr/local/otm/media
 
 initctl reload-configuration
 
